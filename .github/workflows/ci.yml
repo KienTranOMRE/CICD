@@ -1,0 +1,210 @@
+# =============================================================================
+# CI/CD PIPELINE - GitHub Actions
+# =============================================================================
+# This file IS your CI/CD pipeline. Every concept below is demonstrated here.
+# Read the comments to understand each concept.
+#
+# CONCEPT: "Pipeline as Code"
+#   The pipeline is defined in a file (this YAML), versioned in Git alongside
+#   your source code. Everyone can see it, review it, and track changes.
+# =============================================================================
+
+# ---- PIPELINE TRIGGER ----
+# CONCEPT: "When does CI run?"
+# The pipeline triggers automatically on certain Git events.
+name: CI Pipeline
+
+on:
+  push:                    # Runs when code is pushed
+    branches: [main]       # ...to the main branch
+  pull_request:            # Runs when a PR is opened/updated
+    branches: [main]       # ...targeting main
+
+# ---- STAGES / JOBS ----
+# CONCEPT: "Pipeline Stages"
+# A pipeline is split into stages (called "jobs" in GitHub Actions).
+# Each job runs in a fresh, isolated environment.
+# Jobs can run in parallel or sequentially (using "needs").
+
+jobs:
+  # =========================================================================
+  # STAGE 1: LINT (Code Quality Check)
+  # =========================================================================
+  # CONCEPT: "Continuous Integration - Fast Feedback"
+  # Linting is fast. Run it first to catch style issues immediately.
+  lint:
+    name: "Stage 1: Lint"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        # CONCEPT: "Checkout"
+        # The CI server starts with an empty machine.
+        # It must clone your repo before it can do anything.
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run linter (ruff)
+        run: ruff check app/ tests/
+        # If this fails, the whole pipeline STOPS here.
+        # Your code never reaches production with lint errors.
+
+  # =========================================================================
+  # STAGE 2: TEST (Automated Testing)
+  # =========================================================================
+  # CONCEPT: "Continuous Integration - Automated Testing"
+  # Every push triggers tests automatically. No human has to remember to
+  # run them. If tests fail, the pipeline fails, and code cannot be merged.
+  test:
+    name: "Stage 2: Test"
+    runs-on: ubuntu-latest
+    needs: lint              # <-- CONCEPT: "Sequential stages"
+                             # Test only runs AFTER lint passes.
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # CONCEPT: "Caching"
+      # CI machines are ephemeral (destroyed after each run).
+      # Caching saves downloaded dependencies so next run is faster.
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: pytest tests/ -v --cov=app --cov-report=term-missing
+        # CONCEPT: "Quality Gate"
+        # --cov measures code coverage. You can set a threshold:
+        #   --cov-fail-under=80
+        # If coverage drops below 80%, the pipeline FAILS.
+        # This prevents shipping untested code.
+
+      # CONCEPT: "Artifacts"
+      # Artifacts are files produced during a pipeline that you want to keep.
+      # Examples: test reports, built binaries, coverage reports.
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()         # Upload even if tests fail (for debugging)
+        with:
+          name: test-results
+          path: .coverage
+
+  # =========================================================================
+  # STAGE 3: BUILD (Build Artifact)
+  # =========================================================================
+  # CONCEPT: "Build Automation"
+  # In a real project, this stage compiles code, builds Docker images,
+  # or packages your application into a deployable artifact.
+  build:
+    name: "Stage 3: Build"
+    runs-on: ubuntu-latest
+    needs: test              # Runs only after tests pass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build package
+        run: |
+          pip install build
+          python -m build
+        # This creates a distributable package in dist/
+        # In real projects, this could be:
+        #   - docker build -t myapp:${{ github.sha }} .
+        #   - npm run build
+        #   - go build ./...
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: dist/
+          # CONCEPT: "Artifact Management"
+          # The built package is stored so the deploy stage can use it.
+          # This ensures we deploy EXACTLY what was tested.
+
+  # =========================================================================
+  # STAGE 4: DEPLOY (Continuous Delivery / Deployment)
+  # =========================================================================
+  # CONCEPT: "Continuous Delivery vs Continuous Deployment"
+  #
+  # Continuous DELIVERY  = Pipeline prepares a release, but a human
+  #                        clicks "deploy" (manual approval).
+  #
+  # Continuous DEPLOYMENT = Pipeline deploys automatically to production
+  #                         with zero human intervention.
+  #
+  # Below demonstrates Continuous DELIVERY (manual approval gate).
+  deploy-staging:
+    name: "Stage 4a: Deploy to Staging"
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'  # Only deploy from main branch
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: package
+
+      - name: Deploy to staging
+        run: |
+          echo "=== DEPLOYING TO STAGING ==="
+          echo "Artifact: $(ls *.tar.gz 2>/dev/null || ls *.whl 2>/dev/null || echo 'package ready')"
+          echo "Commit:   ${{ github.sha }}"
+          echo "Branch:   ${{ github.ref_name }}"
+          echo "=== STAGING DEPLOYMENT COMPLETE ==="
+          # CONCEPT: "Environment Promotion"
+          # Code flows through environments:
+          #   dev -> staging -> production
+          # Each environment is progressively more "real".
+          # Staging mirrors production so you catch issues before users do.
+
+  deploy-production:
+    name: "Stage 4b: Deploy to Production"
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+
+    # CONCEPT: "Manual Approval Gate" (Continuous DELIVERY)
+    # The "environment" keyword with protection rules requires
+    # a human to approve before this job runs.
+    # Configure this in GitHub: Settings > Environments > production
+    environment:
+      name: production
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: package
+
+      - name: Deploy to production
+        run: |
+          echo "=== DEPLOYING TO PRODUCTION ==="
+          echo "Artifact: $(ls *.tar.gz 2>/dev/null || ls *.whl 2>/dev/null || echo 'package ready')"
+          echo "This would run: kubectl apply, aws ecs update, etc."
+          echo "=== PRODUCTION DEPLOYMENT COMPLETE ==="
