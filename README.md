@@ -1,14 +1,59 @@
 # CI/CD Learning Roadmap for Software Development & AI Production
 
+## Progress
+
+| # | Topic | Status | Notes |
+|---|-------|--------|-------|
+| 1 | Version Control (Git) | Done | Already known before starting |
+| 2 | Core CI/CD Concepts | Done | Docs: `docs/02-core-cicd-concepts.md` |
+| 3 | CI/CD Platforms | In Progress | Built first GitHub Actions pipeline (`.github/workflows/ci.yml`) |
+| 4 | Pipeline Design | - | |
+| 5 | Automated Testing | - | |
+| 6 | Code Quality | - | |
+| 7 | Docker | - | |
+| 8 | Kubernetes | - | |
+| 9 | Infrastructure as Code | - | |
+| 10 | Cloud Platforms | - | |
+| 11 | Deployment Strategies | - | |
+| 12 | Monitoring | - | |
+| 13 | Post-Deployment | - | |
+| 14 | MLOps Fundamentals | - | |
+| 15 | ML Pipeline Orchestration | - | |
+| 16 | Model Training in CI/CD | - | |
+| 17 | Model Evaluation & Validation | - | |
+| 18 | Model Serving & Deployment | - | |
+| 19 | LLM-Specific CI/CD | - | |
+| 20 | Data Pipeline CI/CD | - | |
+| 21 | ML Monitoring in Production | - | |
+| 22 | Security in CI/CD (DevSecOps) | - | |
+| 23 | Best Practices | - | |
+
+## What Was Built
+
+- **Repo:** https://github.com/KienTranOMRE/CICD
+- **Demo app:** `app/calculator.py` — simple Python calculator used as CI target
+- **Tests:** `tests/test_calculator.py` — pytest suite with coverage
+- **Pipeline:** `.github/workflows/ci.yml` — 5-stage GitHub Actions pipeline (lint → test → build → deploy staging → deploy production)
+- **First pipeline run:** Failed at Stage 1 (Lint) due to import sort order in `tests/test_calculator.py` — demonstrates how CI catches issues before code reaches production
+
+## Lessons Learned
+
+1. **Pipeline as Code** works — the entire CI/CD pipeline is a single YAML file versioned alongside the source code
+2. **Sequential stages enforce quality** — the pipeline failed at lint, so test/build/deploy never ran. Broken code cannot reach production.
+3. **GitHub CLI (`gh`)** needs the `workflow` scope to push files under `.github/workflows/`
+4. **First failure is a good thing** — it proves the pipeline is actually checking your code, not just rubber-stamping it
+
+---
+
 ## Part 1: Foundations
 
-### 1. Version Control
+### 1. Version Control -- DONE
 - Git fundamentals (branching, merging, rebasing)
 - Branching strategies (GitFlow, trunk-based development, GitHub Flow)
 - Monorepo vs polyrepo
 - Semantic versioning
 
-### 2. Core CI/CD Concepts
+### 2. Core CI/CD Concepts -- DONE
 - What is Continuous Integration (CI)
 - What is Continuous Delivery (CD)
 - What is Continuous Deployment

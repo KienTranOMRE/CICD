@@ -3,7 +3,12 @@
     "allow": [
       "Bash(gh auth:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git branch:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git -C /Users/kientran8/Codes/CICD push -u origin main)",
+      "Bash(gh run list:*)"
     ]
   }
 }
